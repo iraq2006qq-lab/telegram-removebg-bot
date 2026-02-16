@@ -1,17 +1,16 @@
 import os
 import requests
-from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+from telegram import Bot, Update
+from telegram.ext import Updater, MessageHandler, Filters, CallbackContext
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 REMOVE_BG_API_KEY = os.getenv("REMOVE_BG_API_KEY")
 
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⏳ جارِ تفريغ الخلفية...")
+def handle_photo(update: Update, context: CallbackContext):
+    update.message.reply_text("⏳ جارِ تفريغ الخلفية...")
 
-    photo = update.message.photo[-1]
-    file = await photo.get_file()
-    image_bytes = await file.download_as_bytearray()
+    photo_file = update.message.photo[-1].get_file()
+    image_bytes = photo_file.download_as_bytearray()
 
     response = requests.post(
         "https://api.remove.bg/v1.0/removebg",
@@ -21,10 +20,12 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     if response.status_code == 200:
-        await update.message.reply_document(response.content, filename="no-bg.png")
+        update.message.reply_document(response.content, filename="no-bg.png")
     else:
-        await update.message.reply_text("❌ صار خطأ بتفريغ الصورة، جرّب مرة ثانية.")
+        update.message.reply_text("❌ صار خطأ بتفريغ الصورة، جرّب مرة ثانية.")
 
-app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-app.run_polling()
+updater = Updater(TELEGRAM_TOKEN, use_context=True)
+dp = updater.dispatcher
+dp.add_handler(MessageHandler(Filters.photo, handle_photo))
+updater.start_polling()
+updater.idle()
